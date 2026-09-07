@@ -1,6 +1,6 @@
 <div align="center">
 
-# GDScript Mod Loader
+# Hearth and Hamlet - Godot Mod Loader
 
 <img alt="Godot Modding Logo" src="icon.png" width="256" />
 
@@ -8,65 +8,126 @@
 
 <br />
 
-A generalized Mod Loader for GDScript-based Godot games.  
-The Mod Loader allows users to create mods for games and distribute them as zips.  
-Importantly, it provides methods to change existing scripts, scenes, and resources without modifying and distributing vanilla game files.
+An easy-to-install setup for adding **Godot Mod Loader** support to **Hearth and Hamlet**.
 
-## Features
-- Loading ZIPs as mods into the running game
-  - Makes every script and resource moddable
-  - Vanilla game files are not shared in mods
-  - Disabled mods leave no trace
-  - since Godot 4: workaround to mod scripts using `class_name`
-  - Mod metadata
-    - Compatibility checks between game and mod version
-    - Load order/dependencies between mods 
-    - General info like author and version
-- Mod Configs
-  - Settings for each individual mod
-- Mod Profiles
-  - Lists of mods and configurations that can easily be enabled and disabled
-- Unified logging system for mods
-- Mod Loader Options
-  - allowing different Mod Loader settings per-feature
-- Built in Mod Sources:
-  - Steam Workshop
-  - Thunderstore
-  - Local /mods folder
-- Self Setup for mods that don't have the Mod Loader preinstalled
+This repository includes the required Godot Mod Loader files and an installer that patches the game's PCK with the required global class cache.
 
-## Getting Started
+## Installation
 
-You can find quickstart guides and more on the [Wiki](https://wiki.godotmodding.com/).
+1. Open your **Hearth and Hamlet** installation folder.
 
-## Godot Version
-The Mod Loader is developed for Godot 3 and 4.  
-You can find a stable Godot 3 version on the releases page [Godot 3.x - v6.3.0](https://github.com/GodotModding/godot-mod-loader/releases/tag/v6.3.0) and the [Godot Asset Lib](https://godotengine.org/asset-library/asset/1938).   
-For Godot 4 you can find the latest releases on the [Releases Page](https://github.com/GodotModding/godot-mod-loader/releases) and the [Godot Asset Lib](https://godotengine.org/asset-library/asset/4107).
+   In Steam:
 
-## Development
-The latest work-in-progress build can be found on the [4.x-dev branch](https://github.com/GodotModding/godot-mod-loader/tree/4.x-dev) for Godot 4 and [3.x-dev](https://github.com/GodotModding/godot-mod-loader/tree/3.x-dev) for Godot 3.
+   **Library → Hearth and Hamlet → Manage → Browse local files**
 
-## Compatibility
-The Mod Loader supports the following platforms:
-- Windows
-- macOS
-- Linux
-- Android
-- iOS
+   The default location is usually:
 
-## Keep in Touch
-For more details and updates join us on [our Discord](https://discord.godotmodding.com).
+   ```text
+   C:\Program Files (x86)\Steam\steamapps\common\Hearth and Hamlet
+   ```
 
-## Games Made Moddable by This Project
-- [Brotato](https://store.steampowered.com/app/1942280/Brotato/) by 
-[Blobfish Games](https://store.steampowered.com/developer/blobfishgames)
-- [Dome Keeper](https://store.steampowered.com/app/1637320/Dome_Keeper/) by 
-[Bippinbits](https://store.steampowered.com/developer/bippinbits)
-- [Endoparasitic](https://store.steampowered.com/app/2124780/Endoparasitic/) by [Miziziziz](https://www.youtube.com/@Miziziziz)
-- [Windowkill](https://store.steampowered.com/app/2726450/Windowkill/) by [torcado](https://store.steampowered.com/developer/torcado)
-- [Of Life and Land](https://store.steampowered.com/app/1733110/Of_Life_and_Land/) by [Kerzoven](https://store.steampowered.com/search/?developer=Kerzoven)
-- [Dawnfolk](https://store.steampowered.com/app/2308630/Dawnfolk/) by [Darenn Keller](https://store.steampowered.com/developer/darennkeller)
-- [The Deadseat](https://store.steampowered.com/app/3667230/The_Deadseat/) by [Curious Fox Sox](https://store.steampowered.com/search/?developer=Curious%20Fox%20Sox)
-- [Upload Labs](https://store.steampowered.com/app/3606890/Upload_Labs/) by [EnigmaDev Studios](https://store.steampowered.com/curator/45970580)
-- [Pathogenic](https://store.steampowered.com/app/3808690/Pathogenic/) by [Aberrant Labs](https://store.steampowered.com/search/?developer=Aberrant%20Labs)
+2. Download this repository or the latest release.
+
+3. Extract the contents directly into the **Hearth and Hamlet** folder.
+
+   Your game folder should contain files similar to:
+
+   ```text
+   Hearth and Hamlet/
+   ├── Hearth and Hamlet.exe
+   ├── Hearth and Hamlet.pck
+   ├── Install GML.bat
+   └── addons/
+       └── mod_loader/
+   ```
+
+4. Run:
+
+   ```text
+   Install GML.bat
+   ```
+
+5. Wait for the installer to report:
+
+   ```text
+   SUCCESS
+   ```
+
+6. Start **Hearth and Hamlet** normally through Steam.
+
+## What the installer does
+
+The installer automatically:
+
+- Extracts the game's current global script class cache.
+- Merges it with Godot Mod Loader's class cache.
+- Creates a timestamped backup of `Hearth and Hamlet.pck`.
+- Patches the merged cache into the game's PCK.
+- Creates `override.cfg` with the required Godot Mod Loader autoloads.
+- Creates a `mods` folder.
+
+The `override.cfg` and `mods` folder are only created after the PCK patch completes successfully.
+
+## Installing Mods
+
+After installing Godot Mod Loader, place compatible mod ZIP files inside:
+
+```text
+Hearth and Hamlet\mods\
+```
+
+For example:
+
+```text
+Hearth and Hamlet/
+└── mods/
+    └── Rakibei-ToggleHarvest.zip
+```
+
+Then launch the game normally.
+
+## Updating Hearth and Hamlet
+
+A game update may replace `Hearth and Hamlet.pck`.
+
+If that happens, run:
+
+```text
+Install GML.bat
+```
+
+again so the installer can extract the new game's class cache and patch Godot Mod Loader back into it.
+
+Because the class caches are merged during installation, the installer uses the classes from the currently installed version of the game rather than relying on a pre-generated merged cache.
+
+## Backup
+
+Before modifying the PCK, the installer creates a backup similar to:
+
+```text
+Hearth and Hamlet.pck.backup-[Date]-[Time]
+```
+
+Keep this file if you want an easy way to restore the unpatched PCK.
+
+## Uninstalling
+
+To remove Godot Mod Loader:
+
+1. Close the game.
+2. Delete `override.cfg`.
+3. Delete the `mods` folder if you no longer need your installed mods.
+4. Delete the added `addons` folder.
+5. Restore one of the installer-created PCK backups by renaming it to:
+
+   ```text
+   Hearth and Hamlet.pck
+   ```
+
+Alternatively, use Steam's **Verify integrity of game files** option to restore the original game files.
+
+## Notes
+
+- The installer must be run from the **Hearth and Hamlet** installation folder.
+- Make sure the game is closed before running the installer.
+- Godot Mod Loader is not officially built into Hearth and Hamlet; this repository provides the files and patching required to load it.
