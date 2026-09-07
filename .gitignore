@@ -2,6 +2,9 @@
 # IDEs
 .idea
 .vscode
+.vs
+v18/
+FileContentIndex/
 
 # mac thing
 .DS_Store
