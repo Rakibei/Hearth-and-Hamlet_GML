@@ -9,7 +9,6 @@ rem Expected layout:
 rem   patch_pck.bat
 rem   Hearth and Hamlet.exe
 rem   Hearth and Hamlet.pck
-rem   override.cfg
 rem   addons\mod_loader\...
 rem
 rem This script:
@@ -17,6 +16,7 @@ rem   1. Extracts the game's global_script_class_cache.cfg.
 rem   2. Merges it with Godot Mod Loader's class cache.
 rem   3. Creates a timestamped backup of the current PCK.
 rem   4. Patches only .godot/global_script_class_cache.cfg.
+rem   5. Creates override.cfg and the mods folder after patching succeeds.
 rem
 rem Re-running is safe: Mod Loader class entries are de-duplicated
 rem by class name before the new cache is written.
@@ -70,13 +70,6 @@ if not exist "%MOD_CACHE%" (
     goto :fail
 )
 
-if not exist "%CD%\override.cfg" (
-    echo [WARNING] override.cfg was not found.
-    echo The PCK can still be patched, but Godot Mod Loader will not
-    echo start unless its autoloads are configured.
-    echo.
-)
-
 rem ---- Prepare work directory ---------------------------------
 
 if exist "%WORK_DIR%" rmdir /s /q "%WORK_DIR%"
@@ -89,7 +82,7 @@ if not exist "%EXTRACT_DIR%" (
 
 rem ---- Extract the game's current global class cache -----------
 
-echo [1/4] Extracting the game's global class cache...
+echo [1/5] Extracting the game's global class cache...
 
 "%GDRE%" --headless "--extract=%GAME_PCK%" "--output=%EXTRACT_DIR%" "--include=res://.godot/global_script_class_cache.cfg"
 
@@ -123,37 +116,13 @@ echo.
 
 rem ---- Merge caches --------------------------------------------
 
-echo [2/4] Merging Godot Mod Loader and game class caches...
+echo [2/5] Merging Godot Mod Loader and game class caches...
 
 set "GAME_CACHE_ENV=%GAME_CACHE%"
 set "MOD_CACHE_ENV=%MOD_CACHE%"
 set "MERGED_CACHE_ENV=%MERGED_CACHE%"
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
- "$ErrorActionPreference='Stop';" ^
- "$game=Get-Content -Raw -LiteralPath $env:GAME_CACHE_ENV;" ^
- "$mod=Get-Content -Raw -LiteralPath $env:MOD_CACHE_ENV;" ^
- "$rx='(?s)^\s*list\s*=\s*\[(.*)\]\s*$';" ^
- "$gm=[regex]::Match($game,$rx);" ^
- "$mm=[regex]::Match($mod,$rx);" ^
- "if(-not $gm.Success){throw 'Could not parse the game class cache.'};" ^
- "if(-not $mm.Success){throw 'Could not parse the Mod Loader class cache.'};" ^
- "$objRx='(?s)\{.*?\}';" ^
- "$gameObjects=@([regex]::Matches($gm.Groups[1].Value,$objRx) ^| ForEach-Object {$_.Value});" ^
- "$modObjects=@([regex]::Matches($mm.Groups[1].Value,$objRx) ^| ForEach-Object {$_.Value});" ^
- "function GetClass([string]$o){$m=[regex]::Match($o,'\"class\"\s*:\s*&\"([^\"]+)\"');if($m.Success){return $m.Groups[1].Value};return ''};" ^
- "$modNames=New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal);" ^
- "foreach($o in $modObjects){$n=GetClass $o;if($n){[void]$modNames.Add($n)}};" ^
- "$keptGame=New-Object System.Collections.Generic.List[string];" ^
- "foreach($o in $gameObjects){$n=GetClass $o;if((-not $n) -or (-not $modNames.Contains($n))){$keptGame.Add($o)}};" ^
- "$all=@($modObjects)+@($keptGame);" ^
- "if($all.Count -eq 0){throw 'Merged class cache would be empty.'};" ^
- "$out='list=['+[Environment]::NewLine+($all -join (','+[Environment]::NewLine))+[Environment]::NewLine+']';" ^
- "$utf8=New-Object System.Text.UTF8Encoding($false);" ^
- "[System.IO.File]::WriteAllText($env:MERGED_CACHE_ENV,$out,$utf8);" ^
- "Write-Host ('      Mod Loader classes: ' + $modObjects.Count);" ^
- "Write-Host ('      Game classes kept:   ' + $keptGame.Count);" ^
- "Write-Host ('      Total classes:       ' + $all.Count);"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand JABFAHIAcgBvAHIAQQBjAHQAaQBvAG4AUAByAGUAZgBlAHIAZQBuAGMAZQAgAD0AIAAnAFMAdABvAHAAJwAKAAoAJABnAGEAbQBlACAAPQAgAEcAZQB0AC0AQwBvAG4AdABlAG4AdAAgAC0AUgBhAHcAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAZQBuAHYAOgBHAEEATQBFAF8AQwBBAEMASABFAF8ARQBOAFYACgAkAG0AbwBkACAAIAA9ACAARwBlAHQALQBDAG8AbgB0AGUAbgB0ACAALQBSAGEAdwAgAC0ATABpAHQAZQByAGEAbABQAGEAdABoACAAJABlAG4AdgA6AE0ATwBEAF8AQwBBAEMASABFAF8ARQBOAFYACgAKACMAIABEAG8AIABuAG8AdAAgAGQAZQBwAGUAbgBkACAAbwBuACAAdABoAGUAIABlAHgAYQBjAHQAIAB0AG8AcAAtAGwAZQB2AGUAbAAgACIAbABpAHMAdAA9AC4ALgAuACIAIABzAHkAbgB0AGEAeAAuAAoAIwAgAEcAbwBkAG8AdAAvAEcATQBMACAAZABlAHYAIAB2AGUAcgBzAGkAbwBuAHMAIABtAGEAeQAgAHcAcgBhAHAAIAB0AGgAZQAgAGEAcgByAGEAeQAgAGQAaQBmAGYAZQByAGUAbgB0AGwAeQAuAAoAIwAgAEkAbgBzAHQAZQBhAGQALAAgAGUAeAB0AHIAYQBjAHQAIABlAHYAZQByAHkAIABkAGkAYwB0AGkAbwBuAGEAcgB5AC0AbABpAGsAZQAgAGMAbABhAHMAcwAgAGUAbgB0AHIAeQAgAGYAcgBvAG0AIAB0AGgAZQAgAGYAaQBsAGUAcwAuAAoAJABvAGIAagBSAHgAIAA9ACAAJwAoAD8AcwApAFwAewAuACoAPwBcAH0AJwAKAAoAZgB1AG4AYwB0AGkAbwBuACAARwBlAHQALQBDAGwAYQBzAHMATwBiAGoAZQBjAHQAcwAoAFsAcwB0AHIAaQBuAGcAXQAkAHQAZQB4AHQALAAgAFsAcwB0AHIAaQBuAGcAXQAkAGwAYQBiAGUAbAApACAAewAKACAAIAAgACAAJABvAGIAagBlAGMAdABzACAAPQAgAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABTAHkAcwB0AGUAbQAuAEMAbwBsAGwAZQBjAHQAaQBvAG4AcwAuAEcAZQBuAGUAcgBpAGMALgBMAGkAcwB0AFsAcwB0AHIAaQBuAGcAXQAKAAoAIAAgACAAIABmAG8AcgBlAGEAYwBoACAAKAAkAG0AYQB0AGMAaAAgAGkAbgAgAFsAcgBlAGcAZQB4AF0AOgA6AE0AYQB0AGMAaABlAHMAKAAkAHQAZQB4AHQALAAgACQAbwBiAGoAUgB4ACkAKQAgAHsACgAgACAAIAAgACAAIAAgACAAJABvAGIAagAgAD0AIAAkAG0AYQB0AGMAaAAuAFYAYQBsAHUAZQAKAAoAIAAgACAAIAAgACAAIAAgACMAIABPAG4AbAB5ACAAawBlAGUAcAAgAG8AYgBqAGUAYwB0AHMAIAB0AGgAYQB0ACAAbABvAG8AawAgAGwAaQBrAGUAIABnAGwAbwBiAGEAbAAgAGMAbABhAHMAcwAgAGMAYQBjAGgAZQAgAGUAbgB0AHIAaQBlAHMALgAKACAAIAAgACAAIAAgACAAIABpAGYAIAAoACQAbwBiAGoAIAAtAG0AYQB0AGMAaAAgACcAIgBjAGwAYQBzAHMAIgBcAHMAKgA6ACcAIAAtAGEAbgBkACAAJABvAGIAagAgAC0AbQBhAHQAYwBoACAAJwAiAHAAYQB0AGgAIgBcAHMAKgA6ACcAKQAgAHsACgAgACAAIAAgACAAIAAgACAAIAAgACAAIAAkAG8AYgBqAGUAYwB0AHMALgBBAGQAZAAoACQAbwBiAGoAKQAKACAAIAAgACAAIAAgACAAIAB9AAoAIAAgACAAIAB9AAoACgAgACAAIAAgAGkAZgAgACgAJABvAGIAagBlAGMAdABzAC4AQwBvAHUAbgB0ACAALQBlAHEAIAAwACkAIAB7AAoAIAAgACAAIAAgACAAIAAgAHQAaAByAG8AdwAgACIAQwBvAHUAbABkACAAbgBvAHQAIABmAGkAbgBkACAAYQBuAHkAIABnAGwAbwBiAGEAbAAgAGMAbABhAHMAcwAgAGUAbgB0AHIAaQBlAHMAIABpAG4AIAB0AGgAZQAgACQAbABhAGIAZQBsACAAYwBsAGEAcwBzACAAYwBhAGMAaABlAC4AIgAKACAAIAAgACAAfQAKAAoAIAAgACAAIAByAGUAdAB1AHIAbgAgACQAbwBiAGoAZQBjAHQAcwAKAH0ACgAKAGYAdQBuAGMAdABpAG8AbgAgAEcAZQB0AC0AQwBsAGEAcwBzAE4AYQBtAGUAKABbAHMAdAByAGkAbgBnAF0AJABvAGIAagBlAGMAdABUAGUAeAB0ACkAIAB7AAoAIAAgACAAIAAjACAASABhAG4AZABsAGUAcwAgAGIAbwB0AGgAOgAKACAAIAAgACAAIwAgACAAIAAiAGMAbABhAHMAcwAiADoAIAAmACIATQBvAGQATABvAGEAZABlAHIATABvAGcAIgAKACAAIAAgACAAIwAgAGEAbgBkACAAcABvAHQAZQBuAHQAaQBhAGwAIAB2AGEAcgBpAGEAbgB0AHMAIAB3AGkAdABoAG8AdQB0ACAAdABoAGUAIABTAHQAcgBpAG4AZwBOAGEAbQBlACAAYQBtAHAAZQByAHMAYQBuAGQALgAKACAAIAAgACAAJABtAGEAdABjAGgAIAA9ACAAWwByAGUAZwBlAHgAXQA6ADoATQBhAHQAYwBoACgAJABvAGIAagBlAGMAdABUAGUAeAB0ACwAIAAnACIAYwBsAGEAcwBzACIAXABzACoAOgBcAHMAKgAmAD8AIgAoAFsAXgAiAF0AKwApACIAJwApAAoAIAAgACAAIABpAGYAIAAoACQAbQBhAHQAYwBoAC4AUwB1AGMAYwBlAHMAcwApACAAewAKACAAIAAgACAAIAAgACAAIAByAGUAdAB1AHIAbgAgACQAbQBhAHQAYwBoAC4ARwByAG8AdQBwAHMAWwAxAF0ALgBWAGEAbAB1AGUACgAgACAAIAAgAH0ACgAgACAAIAAgAHIAZQB0AHUAcgBuACAAJwAnAAoAfQAKAAoAJABnAGEAbQBlAE8AYgBqAGUAYwB0AHMAIAA9ACAAQAAoAEcAZQB0AC0AQwBsAGEAcwBzAE8AYgBqAGUAYwB0AHMAIAAkAGcAYQBtAGUAIAAnAGcAYQBtAGUAJwApAAoAJABtAG8AZABPAGIAagBlAGMAdABzACAAIAA9ACAAQAAoAEcAZQB0AC0AQwBsAGEAcwBzAE8AYgBqAGUAYwB0AHMAIAAkAG0AbwBkACAAIAAnAE0AbwBkACAATABvAGEAZABlAHIAJwApAAoACgAkAG0AbwBkAE4AYQBtAGUAcwAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAJwBTAHkAcwB0AGUAbQAuAEMAbwBsAGwAZQBjAHQAaQBvAG4AcwAuAEcAZQBuAGUAcgBpAGMALgBIAGEAcwBoAFMAZQB0AFsAcwB0AHIAaQBuAGcAXQAnACAAKABbAFMAeQBzAHQAZQBtAC4AUwB0AHIAaQBuAGcAQwBvAG0AcABhAHIAZQByAF0AOgA6AE8AcgBkAGkAbgBhAGwAKQAKAGYAbwByAGUAYQBjAGgAIAAoACQAbwBiAGoAZQBjAHQAVABlAHgAdAAgAGkAbgAgACQAbQBvAGQATwBiAGoAZQBjAHQAcwApACAAewAKACAAIAAgACAAJABuAGEAbQBlACAAPQAgAEcAZQB0AC0AQwBsAGEAcwBzAE4AYQBtAGUAIAAkAG8AYgBqAGUAYwB0AFQAZQB4AHQACgAgACAAIAAgAGkAZgAgACgAJABuAGEAbQBlACkAIAB7AAoAIAAgACAAIAAgACAAIAAgAFsAdgBvAGkAZABdACQAbQBvAGQATgBhAG0AZQBzAC4AQQBkAGQAKAAkAG4AYQBtAGUAKQAKACAAIAAgACAAfQAKAH0ACgAKACMAIABLAGUAZQBwACAAZwBhAG0AZQAgAGMAbABhAHMAcwBlAHMAIAB1AG4AbABlAHMAcwAgAEcATQBMACAAcwB1AHAAcABsAGkAZQBzACAAYQAgAGMAbABhAHMAcwAgAHcAaQB0AGgAIAB0AGgAZQAgAHMAYQBtAGUAIABnAGwAbwBiAGEAbAAgAG4AYQBtAGUALgAKACQAawBlAHAAdABHAGEAbQBlACAAPQAgAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABTAHkAcwB0AGUAbQAuAEMAbwBsAGwAZQBjAHQAaQBvAG4AcwAuAEcAZQBuAGUAcgBpAGMALgBMAGkAcwB0AFsAcwB0AHIAaQBuAGcAXQAKAGYAbwByAGUAYQBjAGgAIAAoACQAbwBiAGoAZQBjAHQAVABlAHgAdAAgAGkAbgAgACQAZwBhAG0AZQBPAGIAagBlAGMAdABzACkAIAB7AAoAIAAgACAAIAAkAG4AYQBtAGUAIAA9ACAARwBlAHQALQBDAGwAYQBzAHMATgBhAG0AZQAgACQAbwBiAGoAZQBjAHQAVABlAHgAdAAKACAAIAAgACAAaQBmACAAKAAoAC0AbgBvAHQAIAAkAG4AYQBtAGUAKQAgAC0AbwByACAAKAAtAG4AbwB0ACAAJABtAG8AZABOAGEAbQBlAHMALgBDAG8AbgB0AGEAaQBuAHMAKAAkAG4AYQBtAGUAKQApACkAIAB7AAoAIAAgACAAIAAgACAAIAAgACQAawBlAHAAdABHAGEAbQBlAC4AQQBkAGQAKAAkAG8AYgBqAGUAYwB0AFQAZQB4AHQAKQAKACAAIAAgACAAfQAKAH0ACgAKACQAYQBsAGwAIAA9ACAAQAAoACkACgAkAGEAbABsACAAKwA9ACAAJABtAG8AZABPAGIAagBlAGMAdABzAAoAJABhAGwAbAAgACsAPQAgACQAawBlAHAAdABHAGEAbQBlAAoACgBpAGYAIAAoACQAYQBsAGwALgBDAG8AdQBuAHQAIAAtAGUAcQAgADAAKQAgAHsACgAgACAAIAAgAHQAaAByAG8AdwAgACcATQBlAHIAZwBlAGQAIABjAGwAYQBzAHMAIABjAGEAYwBoAGUAIAB3AG8AdQBsAGQAIABiAGUAIABlAG0AcAB0AHkALgAnAAoAfQAKAAoAIwAgAFQAaABlACAAZwBhAG0AZQAgAGEAbAByAGUAYQBkAHkAIABwAHIAbwB2AGUAZAAgAGkAdAAgAGEAYwBjAGUAcAB0AHMAIAB0AGgAZQAgAHMAdABhAG4AZABhAHIAZAAgAEcAbwBkAG8AdAAgAGMAYQBjAGgAZQAgAHcAcgBhAHAAcABlAHIALgAKACMAIABQAHIAZQBzAGUAcgB2AGUAIAB0AGgAZQAgAGMAbABhAHMAcwAtAGUAbgB0AHIAeQAgAGQAaQBjAHQAaQBvAG4AYQByAGkAZQBzACAAZgByAG8AbQAgAHQAaABlACAAYwB1AHIAcgBlAG4AdAAgAEcATQBMACAAZABlAHYAIABjAGEAYwBoAGUACgAjACAAdgBlAHIAYgBhAHQAaQBtADsAIABvAG4AbAB5ACAAcgBlAGIAdQBpAGwAZAAgAHQAaABlACAAbwB1AHQAZQByACAAbABpAHMAdAAgAGMAbwBuAHQAYQBpAG4AZQByAC4ACgAkAG4AZQB3AEwAaQBuAGUAIAA9ACAAWwBFAG4AdgBpAHIAbwBuAG0AZQBuAHQAXQA6ADoATgBlAHcATABpAG4AZQAKACQAbwB1AHQAcAB1AHQAIAA9ACAAJwBsAGkAcwB0AD0AWwAnACAAKwAgACQAbgBlAHcATABpAG4AZQAgACsAIAAoACQAYQBsAGwAIAAtAGoAbwBpAG4AIAAoACcALAAnACAAKwAgACQAbgBlAHcATABpAG4AZQApACkAIAArACAAJABuAGUAdwBMAGkAbgBlACAAKwAgACcAXQAnAAoACgAkAHUAdABmADgAIAA9ACAATgBlAHcALQBPAGIAagBlAGMAdAAgAFMAeQBzAHQAZQBtAC4AVABlAHgAdAAuAFUAVABGADgARQBuAGMAbwBkAGkAbgBnACgAJABmAGEAbABzAGUAKQAKAFsAUwB5AHMAdABlAG0ALgBJAE8ALgBGAGkAbABlAF0AOgA6AFcAcgBpAHQAZQBBAGwAbABUAGUAeAB0ACgAJABlAG4AdgA6AE0ARQBSAEcARQBEAF8AQwBBAEMASABFAF8ARQBOAFYALAAgACQAbwB1AHQAcAB1AHQALAAgACQAdQB0AGYAOAApAAoACgBXAHIAaQB0AGUALQBIAG8AcwB0ACAAKAAnACAAIAAgACAAIAAgAE0AbwBkACAATABvAGEAZABlAHIAIABjAGwAYQBzAHMAZQBzADoAIAAnACAAKwAgACQAbQBvAGQATwBiAGoAZQBjAHQAcwAuAEMAbwB1AG4AdAApAAoAVwByAGkAdABlAC0ASABvAHMAdAAgACgAJwAgACAAIAAgACAAIABHAGEAbQBlACAAYwBsAGEAcwBzAGUAcwAgAGsAZQBwAHQAOgAgACAAIAAnACAAKwAgACQAawBlAHAAdABHAGEAbQBlAC4AQwBvAHUAbgB0ACkACgBXAHIAaQB0AGUALQBIAG8AcwB0ACAAKAAnACAAIAAgACAAIAAgAFQAbwB0AGEAbAAgAGMAbABhAHMAcwBlAHMAOgAgACAAIAAgACAAIAAgACcAIAArACAAJABhAGwAbAAuAEMAbwB1AG4AdAApAAoA
 
 if errorlevel 1 (
     echo.
@@ -171,7 +140,7 @@ echo.
 
 rem ---- Create backup -------------------------------------------
 
-echo [3/4] Creating backup...
+echo [3/5] Creating backup...
 
 for /f %%I in ('powershell.exe -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "TIMESTAMP=%%I"
 
@@ -190,7 +159,7 @@ echo.
 
 rem ---- Patch PCK -----------------------------------------------
 
-echo [4/4] Patching Hearth and Hamlet.pck...
+echo [4/5] Patching Hearth and Hamlet.pck...
 
 "%GDRE%" --headless "--pck-patch=%GAME_PCK%" "--patch-file=%MERGED_CACHE%=res://.godot/global_script_class_cache.cfg" "--output=%PATCHED_PCK%"
 
@@ -220,6 +189,66 @@ if errorlevel 1 (
     goto :cleanup_fail_keep_backup
 )
 
+rem ---- Finalize Mod Loader setup -------------------------------
+
+echo [5/5] Finalizing Mod Loader setup...
+
+if not exist "%CD%\override.cfg" (
+    >"%CD%\override.cfg" (
+        echo [autoload_prepend]
+        echo.
+        echo ModLoader="*res://addons/mod_loader/mod_loader.gd"
+        echo ModLoaderStore="*res://addons/mod_loader/mod_loader_store.gd"
+    )
+
+    if errorlevel 1 (
+        echo.
+        echo [ERROR] Could not create override.cfg.
+        goto :fail
+    )
+
+    echo       Created: "%CD%\override.cfg"
+) else (
+    echo       override.cfg already exists - leaving it unchanged.
+
+    findstr /C:"ModLoader=" "%CD%\override.cfg" >nul 2>&1
+    if errorlevel 1 (
+        echo.
+        echo [WARNING] The existing override.cfg does not appear to contain
+        echo the Godot Mod Loader autoload entries.
+        echo.
+        echo Expected:
+        echo [autoload_prepend]
+        echo ModLoader="*res://addons/mod_loader/mod_loader.gd"
+        echo ModLoaderStore="*res://addons/mod_loader/mod_loader_store.gd"
+        echo.
+        echo The installer will continue without overwriting your file.
+        echo.
+    )
+)
+
+echo.
+
+rem ---- Create mods folder --------------------------------------
+
+echo       Setting up mods folder...
+
+if not exist "%CD%\mods" (
+    mkdir "%CD%\mods" >nul 2>&1
+
+    if errorlevel 1 (
+        echo.
+        echo [ERROR] Could not create the mods folder.
+        goto :fail
+    )
+
+    echo       Created: "%CD%\mods"
+) else (
+    echo       Mods folder already exists.
+)
+
+echo.
+
 rem ---- Done ----------------------------------------------------
 
 rmdir /s /q "%WORK_DIR%" >nul 2>&1
@@ -229,8 +258,10 @@ echo ============================================================
 echo  SUCCESS
 echo ============================================================
 echo.
-echo Hearth and Hamlet.pck now contains the combined Godot Mod
-echo Loader + game global class cache.
+echo Godot Mod Loader setup completed:
+echo   - override.cfg is present
+echo   - mods folder is present
+echo   - Hearth and Hamlet.pck contains the combined global class cache
 echo.
 echo Backup created:
 echo "%BACKUP_PCK%"
