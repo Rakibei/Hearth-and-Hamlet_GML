@@ -1,1 +1,0 @@
-$1 -d -s --headless --path $PWD addons/gut/gut_cmdln.gd
